@@ -717,7 +717,81 @@ def forecast_residual_returns_ou_signal(
     # For each date in the returns DataFrame
     for i, current_date in enumerate(dates):
         # ===> YOUR CODE BELOW <===
-        raise NotImplementedError("forecast_residual_returns_ou_signal not yet implemented")
+        
+        # Skip early dates
+        if i < lookback:
+            continue
+            
+        # Skip late dates
+        if i + 1 + horizon > len(dates):
+            continue
+
+        current_month = pd.Timestamp(current_date).to_period(refit_period)
+
+        should_refit = (last_refit_month is None or current_month != last_refit_month)
+
+        if should_refit:
+            if verbose:
+                print(f"Refitting forecast regression at {current_date} (month {current_month})")
+
+            start_idx = i - lookback
+            end_idx = i
+            window_dates = residual_returns.index[start_idx:end_idx]
+
+            X_list = []
+            y_list = []
+
+            for d in window_dates:
+                s_row = signal_values.loc[d]
+                m_row = mask_values.loc[d]
+                y_row = future_cumul_returns.loc[d]
+
+                valid_mask = ((m_row == 1)& s_row.notna()& y_row.notna())
+
+                if valid_mask.any():
+                    X_list.extend(s_row[valid_mask].astype(float).tolist())
+                    y_list.extend(y_row[valid_mask].astype(float).tolist())
+
+            if len(X_list) >= 2:
+                reg = stats.linregress(X_list, y_list)
+                beta_1 = float(reg.slope)
+                beta_0 = float(reg.intercept)
+
+                beta_coefficients.append({
+                    "beta_0": beta_0,
+                    "beta_1": beta_1,
+                    "r_value": float(reg.rvalue),
+                    "p_value": float(reg.pvalue),
+                    "stderr": float(reg.stderr) if reg.stderr is not None else np.nan,
+                    "n_obs": float(len(X_list)),})
+
+                beta_dates.append(pd.Timestamp(current_date))
+
+            else:
+                beta_0 = 0.0
+                beta_1 = 0.0
+                beta_coefficients.append({
+                    "beta_0": beta_0,
+                    "beta_1": beta_1,
+                    "r_value": np.nan,
+                    "p_value": np.nan,
+                    "stderr": np.nan,
+                    "n_obs": float(len(X_list)),})
+
+                beta_dates.append(pd.Timestamp(current_date))
+
+            last_refit_month = current_month
+
+        # Make forecasts for current_date
+        s_today = signal_values.loc[current_date]
+        m_today = mask_values.loc[current_date]
+
+        valid_forecast = (s_today.notna()& (m_today == 1))
+
+        if valid_forecast.any():
+            forecasted_returns.loc[current_date,valid_forecast.index[valid_forecast]] = (
+                beta_0+ beta_1 * s_today[valid_forecast].astype(float))
+
         # ===> YOUR CODE ABOVE <===
     
     # Create DataFrame of beta coefficients
@@ -752,30 +826,7 @@ def forecast_returns_noisy_oracle(residual_returns: pd.DataFrame, config: dict) 
     np.random.seed(seed)
     
     # ===> YOUR CODE BELOW <===
-    
-    # 2. Calculates future cumulative returns over a specified horizon. 
-    # As an approximation, we just use the mean of the returns over the horizon to represent this.
-    future_returns = sum(residual_returns.shift(-h) for h in range(1, horizon+1)) / horizon
-
-    # 3. Calculates the variance of the returns, the variance of the random noise scaled by the information coefficient, and the optimal coefficient
-    sigma_r_sq = future_returns.var(axis=0)
-    sigma_eta_sq = sigma_r_sq * (1 / information_coefficient ** 2 - 1)
-    alpha_opt = information_coefficient ** 2
-
-    # 4. Creates noise with standard deviation sigma_eta
-    sigma_eta = np.sqrt(sigma_eta_sq)
-    T, N = future_returns.shape
-    noise = pd.DataFrame(
-        np.random.randn(T, N) * sigma_eta.values,
-        index=future_returns.index,
-        columns=residual_returns.columns
-    )
-
-    # 5. Returns alpha * (future_returns + noise) as the forecast
-    predicted_with_noise = alpha_opt * (future_returns + noise)
-    
-    return predicted_with_noise
-    
+    raise NotImplementedError("forecast_returns_noisy_oracle not yet implemented")
     # ===> YOUR CODE ABOVE <===
 
 
