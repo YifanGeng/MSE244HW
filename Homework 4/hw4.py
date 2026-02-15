@@ -826,7 +826,30 @@ def forecast_returns_noisy_oracle(residual_returns: pd.DataFrame, config: dict) 
     np.random.seed(seed)
     
     # ===> YOUR CODE BELOW <===
-    raise NotImplementedError("forecast_returns_noisy_oracle not yet implemented")
+    
+    # 2. Calculates future cumulative returns over a specified horizon. 
+    # As an approximation, we just use the mean of the returns over the horizon to represent this.
+    future_returns = sum(residual_returns.shift(-h) for h in range(1, horizon+1)) / horizon
+
+    # 3. Calculates the variance of the returns, the variance of the random noise scaled by the information coefficient, and the optimal coefficient
+    sigma_r_sq = future_returns.var(axis=0)
+    sigma_eta_sq = sigma_r_sq * (1 / information_coefficient ** 2 - 1)
+    alpha_opt = information_coefficient ** 2
+
+    # 4. Creates noise with standard deviation sigma_eta
+    sigma_eta = np.sqrt(sigma_eta_sq)
+    T, N = future_returns.shape
+    noise = pd.DataFrame(
+        np.random.randn(T, N) * sigma_eta.values,
+        index=future_returns.index,
+        columns=residual_returns.columns
+    )
+
+    # 5. Returns alpha * (future_returns + noise) as the forecast
+    predicted_with_noise = alpha_opt * (future_returns + noise)
+    
+    return predicted_with_noise
+    
     # ===> YOUR CODE ABOVE <===
 
 
